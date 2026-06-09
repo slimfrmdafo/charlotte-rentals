@@ -60,8 +60,16 @@ def scrape_rentcom():
                 baths = [fp.get('bathCount') for fp in fps if fp.get('bathCount') is not None]
                 sqft = [s for fp in fps for s in (fp.get('sqFtRange') or {}).values() if s]
                 avail = next((fp.get('availableDate') for fp in fps if fp.get('availableDate')), "")
-                badges = x.get('categoryBadges') or []
-                special = "Specials" if any('special' in str(b).lower() or 'free' in str(b).lower() for b in badges) else ""
+                # move-in specials: dealTypes[].text are short badges, dealsText is the full blurb
+                deal_types = [d.get('text', '').strip() for d in (x.get('dealTypes') or []) if d.get('text')]
+                seen_dt, ordered = set(), []
+                for t in deal_types:                       # dedup, keep order, concession badges first
+                    if t.lower() not in seen_dt:
+                        seen_dt.add(t.lower()); ordered.append(t)
+                ordered.sort(key=lambda t: (t.lower() == 'lowered fees',))  # push generic "Lowered Fees" last
+                special = " · ".join(ordered)[:80]
+                if not special and (x.get('deals') or x.get('dealsText')):
+                    special = "Specials"
                 key = x.get('urlPathname') or x.get('name')
                 out[key] = blank(
                     name=x.get('name', ''), zip=str(loc.get('zip') or ''),
